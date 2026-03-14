@@ -38,31 +38,6 @@ def generate_random_solution():
     return board
 
 # -------------------------
-# 行ごとにヒントを残す（難易度調整）
-# -------------------------
-def make_balanced_puzzle(solution, hints_per_row):
-    puzzle = [[0] * 6 for _ in range(6)]
-    for r in range(6):
-        cols = list(range(6))
-        random.shuffle(cols)
-        for c in cols[:hints_per_row]:
-            puzzle[r][c] = solution[r][c]
-    return puzzle
-
-# -------------------------
-# ランダムに追加で消す
-# -------------------------
-def remove_random_cells(puzzle, remove_count):
-    cells = [(r, c) for r in range(6) for c in range(6) if puzzle[r][c] != 0]
-    random.shuffle(cells)
-
-    for i in range(min(remove_count, len(cells))):
-        r, c = cells[i]
-        puzzle[r][c] = 0
-
-    return puzzle
-
-# -------------------------
 # 全解探索（2つ見つかったら打ち切り）
 # -------------------------
 def solve_all(board):
@@ -95,43 +70,44 @@ def solve_all(board):
     return solutions[0]
 
 # -------------------------
-# 難易度別パズル生成
+# 一意性を保ちながら削除する方式（難易度調整）
 # -------------------------
 def generate_puzzle(difficulty):
-    if difficulty == "A":  # やさしい
-        hints_per_row = 3
-        extra_remove = 0
-    elif difficulty == "B":  # ふつう
-        hints_per_row = 2
-        extra_remove = 2
-    elif difficulty == "C":  # むずかしい
-        hints_per_row = 2
-        extra_remove = 4
+    solution = generate_random_solution()
+    puzzle = [row[:] for row in solution]
+
+    # ★ 新しい難易度設定（ヒント総数）
+    if difficulty == "A":      # 最も易しい
+        target_clues = 20
+    elif difficulty == "B":    # 中間
+        target_clues = 18
+    elif difficulty == "C":    # 最も難しい
+        target_clues = 16
     else:
         raise ValueError("難易度は A / B / C から選んでください")
 
-    attempt = 1
-    while True:
-        print(f"試行 {attempt}: 完成盤を生成中…")
-        solution = generate_random_solution()
+    # 全セルをシャッフルして削除候補順を作る
+    cells = [(r, c) for r in range(6) for c in range(6)]
+    random.shuffle(cells)
 
-        puzzle = make_balanced_puzzle(solution, hints_per_row)
-        puzzle = remove_random_cells(puzzle, extra_remove)
+    for r, c in cells:
+        current_clues = sum(1 for rr in range(6) for cc in range(6) if puzzle[rr][cc] != 0)
+        if current_clues <= target_clues:
+            break
+
+        backup = puzzle[r][c]
+        puzzle[r][c] = 0
 
         sol_count = solve_all([row[:] for row in puzzle])
-        print(f"試行 {attempt}: 解の数 = {sol_count}")
+        if sol_count != 1:
+            puzzle[r][c] = backup  # 一意でなくなったら戻す
 
-        if sol_count == 1:
-            print("一意解のパズルが完成しました。")
-            return puzzle
-
-        attempt += 1
+    return puzzle
 
 # -------------------------
-# PDF 出力（0 は空欄）＋ スクリプトと同じフォルダに保存
+# PDF 出力（0 は空欄）
 # -------------------------
 def write_pdf(board, filename="puzzle6x6.pdf"):
-    # スクリプトのあるフォルダに保存する
     script_dir = os.path.dirname(os.path.abspath(__file__))
     filepath = os.path.join(script_dir, filename)
 
